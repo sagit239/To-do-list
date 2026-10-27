@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "regions": ["fra1"],
+  "rewrites": [{ "source": "/((?!api/|@|src/|node_modules/)[^.]*)", "destination": "/index.html" }]
+}

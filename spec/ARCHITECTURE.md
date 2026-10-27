@@ -304,3 +304,11 @@ Chrome Desktop / Chrome Android (PWA)
 **החלטה:** `@playwright/test` כ-devDependency; דפדפן Chromium מותקן לתוך `node_modules/playwright-core/.local-browsers` (`PLAYWRIGHT_BROWSERS_PATH=0`) על ידי `scripts/install-browser.mjs`, שרץ אוטומטית כ-`postinstall` של `npm install`. `npm run test:e2e` מריץ את `e2e/*.spec.ts` מול `vercel dev` (פורט 3000) ופרויקט ה-Dev, בשני מצבים: Desktop Chrome ו-Mobile Chrome (Pixel 7). לפני ההרצה נשמר עותק של טבלת `tasks` ב-Dev ובסיומה הוא מוחזר (`test-support/devSnapshot.ts`, משותף עם בדיקות ה-Integration, לפי ADR-7). שגיאות שרת ומצב לא-מקוון מדומים בדפדפן (`page.route`, `setOffline`). מול Production מבוצעות רק בדיקות קריאה.
 
 **השלכות:** הרצה ראשונה של `npm install` מורידה כ-150MB. גרירה במגע אמיתי והתקנת PWA בטלפון נבדקות ידנית. בזמן הרצת E2E הרשימה ב-Dev משתנה זמנית.
+
+### ADR-12: הרצה מקומית, SPA fallback ותאריכים מ-PostgreSQL
+
+**הקשר:** במהלך בניית Milestone 1 התגלו שלוש בעיות: `vercel dev` מפעיל בעצמו את סקריפט `dev` של `package.json`, ולכן סקריפט `dev` שמריץ `vercel dev` נכנס ללולאה; כלל ה-SPA fallback הכללי ב-`vercel.json` תפס גם את קובצי הפיתוח של Vite (`/src/*`, `/@vite/*`) והחזיר במקומם `index.html`, כך שהדף נשאר לבן; ו-`pg` ממיר עמודות `date` לאובייקט `Date` לפי אזור הזמן של המכונה, מה שמזיז את התאריך ביום.
+
+**החלטה:** `npm start` מריץ `vercel dev` (אתר + API), ו-`npm run dev` מריץ Vite בלבד. כלל ה-Rewrite ב-`vercel.json` חל רק על נתיבי דפים – ללא סיומת קובץ, ולא על `/api/`, `/src/`, `/@` או `/node_modules/`. ב-`api/_lib/db.ts` מוגדר Type Parser שמחזיר `date` כמחרוזת `YYYY-MM-DD` כפי שהיא.
+
+**השלכות:** Refresh ב-`/about` עובד גם מקומית וגם ב-Vercel, בלי לפגוע ב-API או בקבצים סטטיים. נתיב עתידי שמכיל נקודה לא יקבל SPA fallback. תאריכי יעד מגיעים ללקוח בדיוק כפי שנשמרו.

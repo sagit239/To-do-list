@@ -1,0 +1,35 @@
+/* Design tokens from DESIGN.md / style-guide.png */
+:root {
+  --color-primary: #2f80ed;
+  --color-primary-light: #56ccf2;
+  --color-background: #eaf6ff;
+  --color-surface: #ffffff;
+  --color-text-primary: #1f2937;
+  --color-text-secondary: #6b7280;
+  --color-border: #d1d5db;
+  --color-input-background: #f3f4f6;
+  --color-success: #27ae60;
+  --color-error: #eb5757;
+  --color-warning: #f2c94c;
+  --color-selected: #e3f1fd;
+  --color-error-soft: #fdeeee;
+
+  --font-family: 'Inter Variable', 'Segoe UI', Roboto, 'Noto Sans Hebrew', Arial, sans-serif;
+  --font-h1: 700 32px / 1.25 var(--font-family);
+  --font-h2: 700 24px / 1.3 var(--font-family);
+  --font-h3: 600 18px / 1.4 var(--font-family);
+  --font-body-lg: 400 16px / 1.5 var(--font-family);
+  --font-body-md: 400 14px / 1.5 var(--font-family);
+  --font-body-sm: 400 12px / 1.5 var(--font-family);
+
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.08);
+}

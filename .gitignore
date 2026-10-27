@@ -24,6 +24,7 @@ out/
 # --- Hosting & backend services ---
 .vercel/
 supabase/.temp/
+supabase/.branches/
 
 # --- Mobile ---
 .expo/

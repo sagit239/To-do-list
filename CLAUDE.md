@@ -57,5 +57,5 @@
 
 ## פקודות הרצה
 > Claude ממלא זאת ברגע שהאפליקציה יכולה לרוץ (בדרך כלל בסיום Milestone 1), ומעדכן אם משהו משתנה.
-- **הרצה (dev):** `<command>`
-- **בדיקות (test):** `<command, או "אין">`
+- **הרצה (dev):** `npm start` (מריץ `vercel dev` – אתר + API ב-`http://localhost:3000`, מול פרויקט ה-Dev)
+- **בדיקות (test):** `npm test` (יחידה וממשק); `npm run test:integration` ו-`npm run test:e2e` רצים מול פרויקט ה-Dev ומחזירים את הנתונים בסיום
