@@ -250,10 +250,6 @@ textarea {
   color: var(--color-text-secondary);
 }
 
-.field__input[readonly] {
-  background: var(--color-input-background);
-}
-
 .field__input--multiline {
   resize: vertical;
   min-height: 120px;
@@ -279,6 +275,21 @@ textarea {
   background: var(--color-error-soft);
   color: var(--color-error);
   font: var(--font-body-md);
+}
+
+.form-success {
+  padding: 10px var(--space-2);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-sm);
+  background: var(--color-success-soft);
+  color: var(--color-success-text);
+  font: var(--font-body-md);
+}
+
+.task-details__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 /* ---------- Buttons ---------- */
@@ -314,6 +325,25 @@ textarea {
 
 .btn--secondary:hover:not(:disabled) {
   background: var(--color-selected);
+}
+
+.btn--danger {
+  border-color: var(--color-error);
+  background: var(--color-surface);
+  color: var(--color-error);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: var(--color-error-soft);
+}
+
+.btn--danger-solid {
+  background: var(--color-error);
+  color: var(--color-surface);
+}
+
+.btn--danger-solid:hover:not(:disabled) {
+  background: var(--color-error-hover);
 }
 
 .btn:disabled {
@@ -402,6 +432,19 @@ textarea {
   flex: 1;
 }
 
+.modal--small {
+  max-width: 400px;
+}
+
+.modal--small .modal__title {
+  margin-bottom: var(--space-2);
+}
+
+.modal__text {
+  margin-bottom: var(--space-2);
+  font: var(--font-body-lg);
+}
+
 /* ---------- About ---------- */
 
 .about {
@@ -462,6 +505,10 @@ textarea {
 
   .field__input--date {
     max-width: none;
+  }
+
+  .task-details__actions .btn {
+    flex: 1;
   }
 
   .about {

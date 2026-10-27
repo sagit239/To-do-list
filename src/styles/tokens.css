@@ -15,6 +15,9 @@
   --color-error-soft: #fdeeee;
   --color-primary-hover: #1c6ad6;
   --color-disabled: #c4cad3;
+  --color-error-hover: #d94545;
+  --color-success-soft: #eaf7ef;
+  --color-success-text: #1e7e46;
 
   --font-family: 'Inter Variable', 'Segoe UI', Roboto, 'Noto Sans Hebrew', Arial, sans-serif;
   --font-h1: 700 32px / 1.25 var(--font-family);

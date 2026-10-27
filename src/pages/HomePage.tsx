@@ -41,6 +41,35 @@ export function HomePage() {
     setCreateOpen(false);
   }
 
+  function handleSaved(saved: Task) {
+    // Only the detail fields come from the save; status and position stay as they are here (ADR-9).
+    setState((current) =>
+      current.status === 'ready'
+        ? {
+            status: 'ready',
+            tasks: current.tasks.map((task) =>
+              task.id === saved.id
+                ? { ...task, title: saved.title, description: saved.description, dueDate: saved.dueDate }
+                : task,
+            ),
+          }
+        : current,
+    );
+  }
+
+  function handleDeleted(id: string) {
+    // The server renumbers positions to 0..N-1 after a delete; mirror that locally.
+    setState((current) =>
+      current.status === 'ready'
+        ? {
+            status: 'ready',
+            tasks: current.tasks.filter((task) => task.id !== id).map((task, index) => ({ ...task, position: index })),
+          }
+        : current,
+    );
+    setSelectedId(null);
+  }
+
   return (
     <>
       <div className="page-header">
@@ -85,7 +114,12 @@ export function HomePage() {
           <h2 id="task-details-title" className="panel__title">
             פרטי משימה
           </h2>
-          <TaskDetails key={selectedTask?.id ?? 'none'} task={selectedTask} />
+          <TaskDetails
+            key={selectedTask?.id ?? 'none'}
+            task={selectedTask}
+            onSaved={handleSaved}
+            onDeleted={handleDeleted}
+          />
         </section>
       </div>
       {isCreateOpen && <CreateTaskModal onClose={() => setCreateOpen(false)} onCreated={handleCreated} />}

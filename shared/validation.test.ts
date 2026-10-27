@@ -86,6 +86,11 @@ describe('validateTaskInput', () => {
     expect(validateTaskInput({ title: 'x', dueDate: past }, { today, storedDueDate: past }).ok).toBe(true);
     expect(validateTaskInput({ title: 'x', dueDate: '2026-01-02' }, { today, storedDueDate: past }).ok).toBe(false);
   });
+
+  it('when editing, clearing the date is allowed and a missing stored date still blocks past dates', () => {
+    expect(validateTaskInput({ title: 'x', dueDate: null }, { today, storedDueDate: '2026-01-01' }).ok).toBe(true);
+    expect(validateTaskInput({ title: 'x', dueDate: '2026-01-01' }, { today, storedDueDate: null }).ok).toBe(false);
+  });
 });
 
 describe('dates', () => {

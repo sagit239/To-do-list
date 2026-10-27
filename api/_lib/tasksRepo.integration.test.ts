@@ -2,7 +2,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type pg from 'pg';
 import { createDevPool, restoreSnapshot, takeSnapshot } from '../../test-support/devSnapshot.js';
 import { getPool } from './db.js';
-import { TaskLimitError, createTask, listTasks } from './tasksRepo.js';
+import {
+  TaskLimitError,
+  TaskNotFoundError,
+  createTask,
+  deleteTask,
+  listTasks,
+  updateTaskDetails,
+} from './tasksRepo.js';
 
 let admin: pg.Pool;
 let snapshot: Awaited<ReturnType<typeof takeSnapshot>>;
@@ -134,6 +141,140 @@ describe('createTask against the Dev database', () => {
       );
       const positions = (await listTasks()).map((t) => t.position);
       expect(positions).toEqual([0, 1, 2, 3, 4, 5]);
+    } finally {
+      await visitorB.end();
+    }
+  });
+});
+
+const TODAY = '2026-10-27';
+
+async function insertTask(values: { title?: string | null; description?: string | null; dueDate?: string | null; completed?: boolean; position: number }) {
+  const result = await admin.query<{ id: string }>(
+    `insert into public.tasks (title, description, due_date, completed, position)
+     values ($1, $2, $3, $4, $5) returning id`,
+    [values.title ?? null, values.description ?? null, values.dueDate ?? null, values.completed ?? false, values.position],
+  );
+  return result.rows[0].id;
+}
+
+async function storedRow(id: string) {
+  const result = await admin.query(
+    `select title, description, due_date::text as due_date, completed, position from public.tasks where id = $1`,
+    [id],
+  );
+  return result.rows[0];
+}
+
+const MISSING_ID = '00000000-0000-4000-8000-0000000000ff';
+
+describe('updateTaskDetails against the Dev database', () => {
+  it('saves the three fields and never touches status or position', async () => {
+    await insertTask({ title: 'ראשונה', position: 0 });
+    const id = await insertTask({ title: 'ישנה', description: 'תיאור', dueDate: '2030-01-01', completed: true, position: 1 });
+
+    const result = await updateTaskDetails(id, { title: ' חדשה ', description: '', dueDate: '2031-02-03' }, TODAY);
+
+    expect(result).toEqual({
+      ok: true,
+      task: { id, title: 'חדשה', description: null, dueDate: '2031-02-03', completed: true, position: 1 },
+    });
+    expect(await storedRow(id)).toEqual({
+      title: 'חדשה', description: null, due_date: '2031-02-03', completed: true, position: 1,
+    });
+  });
+
+  it('allows saving a task whose stored due date has passed when the date is unchanged', async () => {
+    const id = await insertTask({ title: 'באיחור', dueDate: '2020-05-05', position: 0 });
+    const result = await updateTaskDetails(id, { title: 'עדיין באיחור', description: null, dueDate: '2020-05-05' }, TODAY);
+    expect(result.ok).toBe(true);
+    expect(await storedRow(id)).toMatchObject({ title: 'עדיין באיחור', due_date: '2020-05-05' });
+  });
+
+  it('rejects changing the due date to another past date, without saving anything', async () => {
+    const id = await insertTask({ title: 'באיחור', dueDate: '2020-05-05', position: 0 });
+    const result = await updateTaskDetails(id, { title: 'שונה', description: null, dueDate: '2020-05-06' }, TODAY);
+    expect(result).toMatchObject({ ok: false, errors: [{ field: 'dueDate', code: 'DATE_IN_PAST' }] });
+    expect(await storedRow(id)).toMatchObject({ title: 'באיחור', due_date: '2020-05-05' });
+  });
+
+  it('throws TaskNotFoundError for a task that does not exist', async () => {
+    await expect(
+      updateTaskDetails(MISSING_ID, { title: 'x', description: null, dueDate: null }, TODAY),
+    ).rejects.toBeInstanceOf(TaskNotFoundError);
+  });
+
+  it('concurrent saves of the same task: the last one wins whole, status and position stay', async () => {
+    await insertTask({ title: 'א', position: 0 });
+    const id = await insertTask({ title: 'מקור', description: 'מקור', completed: true, position: 1 });
+    const visitorB = createDevPool();
+    try {
+      const a = { title: 'מבקר א', description: 'תיאור א', dueDate: '2031-01-01' };
+      const b = { title: 'מבקר ב', description: null, dueDate: null };
+      const results = await Promise.all([
+        updateTaskDetails(id, a, TODAY),
+        updateTaskDetails(id, b, TODAY, visitorB),
+      ]);
+      expect(results.every((r) => r.ok)).toBe(true);
+      const row = await storedRow(id);
+      const fromA = { title: a.title, description: a.description, due_date: a.dueDate };
+      const fromB = { title: b.title, description: b.description, due_date: b.dueDate };
+      const { completed, position, ...details } = row;
+      expect([fromA, fromB]).toContainEqual(details);
+      expect({ completed, position }).toEqual({ completed: true, position: 1 });
+    } finally {
+      await visitorB.end();
+    }
+  });
+});
+
+async function positions(): Promise<{ title: string; position: number }[]> {
+  const result = await admin.query<{ title: string; position: number }>(
+    'select title, position from public.tasks order by position, id',
+  );
+  return result.rows;
+}
+
+describe('deleteTask against the Dev database', () => {
+  it('deletes a task from the middle and renumbers positions to 0..N-1', async () => {
+    await insertTask({ title: 'א', position: 0 });
+    const middle = await insertTask({ title: 'ב', position: 1 });
+    await insertTask({ title: 'ג', position: 2 });
+    await insertTask({ title: 'ד', position: 7 });
+
+    await deleteTask(middle);
+
+    expect(await positions()).toEqual([
+      { title: 'א', position: 0 },
+      { title: 'ג', position: 1 },
+      { title: 'ד', position: 2 },
+    ]);
+  });
+
+  it('a second delete of the same task throws TaskNotFoundError and changes nothing', async () => {
+    const id = await insertTask({ title: 'א', position: 0 });
+    await insertTask({ title: 'ב', position: 1 });
+    await deleteTask(id);
+    await expect(deleteTask(id)).rejects.toBeInstanceOf(TaskNotFoundError);
+    expect(await countTasks()).toBe(1);
+  });
+
+  it('concurrent deletes and creates keep positions unique and consecutive', async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 6; i += 1) ids.push(await insertTask({ title: `ישנה ${i}`, position: i }));
+    const visitorB = createDevPool();
+    try {
+      await Promise.all([
+        deleteTask(ids[1]),
+        createTask({ title: 'חדשה 1', description: null, dueDate: null }, visitorB),
+        deleteTask(ids[4], visitorB),
+        createTask({ title: 'חדשה 2', description: null, dueDate: null }),
+        deleteTask(ids[0]),
+      ]);
+      const rows = await positions();
+      expect(rows).toHaveLength(5);
+      expect(rows.map((r) => r.position)).toEqual([0, 1, 2, 3, 4]);
+      expect(rows.map((r) => r.title)).toEqual(expect.arrayContaining(['ישנה 2', 'ישנה 3', 'ישנה 5', 'חדשה 1', 'חדשה 2']));
     } finally {
       await visitorB.end();
     }

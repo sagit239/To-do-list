@@ -1,10 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { todayInZone, validateTaskInput } from '../../shared/validation.js';
 import { TaskLimitError, createTask, listTasks } from '../_lib/tasksRepo.js';
-import { methodNotAllowed, readJsonBody, sendError, sendJson, sendServerError } from '../_lib/http.js';
-
-// PostgreSQL check_violation / string_data_right_truncation: a backstop behind the shared validation.
-const DB_INPUT_ERRORS = new Set(['23514', '22001']);
+import { isDbInputError, methodNotAllowed, readJsonBody, sendError, sendJson, sendServerError } from '../_lib/http.js';
 
 async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<void> {
   const parsed = readJsonBody(req);
@@ -23,7 +20,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
   } catch (err) {
     if (err instanceof TaskLimitError) {
       sendError(res, 409, 'TASK_LIMIT_REACHED', 'הרשימה מלאה (1,000 משימות). יש למחוק משימה כדי להוסיף חדשה.');
-    } else if (DB_INPUT_ERRORS.has((err as { code?: string } | null)?.code ?? '')) {
+    } else if (isDbInputError(err)) {
       sendError(res, 422, 'VALIDATION_ERROR', 'הנתונים שנשלחו אינם תקינים.');
     } else {
       sendServerError(res, err);

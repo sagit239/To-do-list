@@ -52,21 +52,43 @@ export async function fetchTasks(signal?: AbortSignal): Promise<Task[]> {
   return body as Task[];
 }
 
-export async function createTask(input: TaskInput): Promise<Task> {
+export const DELETE_ERROR_MESSAGE = 'המחיקה נכשלה. נסו שוב.';
+
+/** Sends a write request; resolves only on a 2xx response. */
+async function sendWrite(url: string, method: string, failureMessage: string, body?: unknown): Promise<Response> {
   let response: Response;
   try {
-    response = await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+    response = await fetch(url, {
+      method,
+      headers:
+        body === undefined
+          ? { Accept: 'application/json' }
+          : { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
     throw new ApiRequestError(SAVE_NETWORK_ERROR_MESSAGE, null, 'NETWORK_ERROR');
   }
-  if (!response.ok) throw await readError(response, SAVE_ERROR_MESSAGE);
+  if (!response.ok) throw await readError(response, failureMessage);
+  return response;
+}
+
+async function readTask(response: Response): Promise<Task> {
   try {
     return (await response.json()) as Task;
   } catch {
     throw new ApiRequestError(SAVE_ERROR_MESSAGE, response.status, 'INVALID_RESPONSE');
   }
+}
+
+export async function createTask(input: TaskInput): Promise<Task> {
+  return readTask(await sendWrite('/api/tasks', 'POST', SAVE_ERROR_MESSAGE, input));
+}
+
+export async function updateTask(id: string, input: TaskInput): Promise<Task> {
+  return readTask(await sendWrite(`/api/tasks/${encodeURIComponent(id)}`, 'PATCH', SAVE_ERROR_MESSAGE, input));
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  await sendWrite(`/api/tasks/${encodeURIComponent(id)}`, 'DELETE', DELETE_ERROR_MESSAGE);
 }

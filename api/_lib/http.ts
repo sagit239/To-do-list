@@ -65,3 +65,21 @@ export function readJsonBody(req: VercelRequest, maxBytes = DEFAULT_BODY_LIMIT):
   if (Buffer.byteLength(JSON.stringify(body)) > maxBytes) return tooLarge;
   return { ok: true, body: body as Record<string, unknown> };
 }
+
+export function sendNoContent(res: VercelResponse): void {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(204).end();
+}
+
+// PostgreSQL check_violation / string_data_right_truncation: a backstop behind the shared validation.
+export const DB_INPUT_ERRORS = new Set(['23514', '22001']);
+
+export function isDbInputError(err: unknown): boolean {
+  return DB_INPUT_ERRORS.has((err as { code?: string } | null)?.code ?? '');
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID_PATTERN.test(value);
+}

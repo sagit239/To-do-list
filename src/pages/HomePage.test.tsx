@@ -70,12 +70,105 @@ describe('HomePage', () => {
     expect(screen.queryByText('בחר משימה מהרשימה כדי לצפות בפרטיה')).not.toBeInTheDocument();
   });
 
-  it('does not show edit or delete actions yet', async () => {
+  it('shows editable fields with save and delete actions', async () => {
     mockFetch(() => jsonResponse(tasks));
     renderHome();
     await userEvent.click(await screen.findByRole('button', { name: 'לקנות מצרכים' }));
-    expect(screen.queryByRole('button', { name: /שמור שינויים|מחק משימה/ })).toBeNull();
-    expect(screen.getByLabelText('כותרת')).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('כותרת')).not.toHaveAttribute('readonly');
+    expect(screen.getByRole('button', { name: 'שמור שינויים' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'מחק משימה' })).toBeEnabled();
+  });
+
+  it('saving updates the row text and keeps status and position', async () => {
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
+      init?.method === 'PATCH'
+        ? // The server answer carries a different status; the list must not take it from a details save.
+          jsonResponse({ ...tasks[0], title: 'לקנות ירקות', completed: true })
+        : jsonResponse(tasks),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    renderHome();
+    await userEvent.click(await screen.findByRole('button', { name: 'לקנות מצרכים' }));
+    await userEvent.clear(screen.getByLabelText('כותרת'));
+    await userEvent.type(screen.getByLabelText('כותרת'), 'לקנות ירקות');
+    await userEvent.click(screen.getByRole('button', { name: 'שמור שינויים' }));
+
+    expect(await screen.findByText('השינויים נשמרו')).toBeInTheDocument();
+    const rows = screen.getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('לקנות ירקות');
+    expect(rows[0]).not.toHaveClass('task-row--completed');
+    const [url, init] = fetchMock.mock.calls.find(([, i]) => i?.method === 'PATCH')!;
+    expect(url).toBe('/api/tasks/1');
+    expect(JSON.parse(init!.body as string)).toEqual({
+      title: 'לקנות ירקות',
+      description: 'חלב ולחם',
+      dueDate: '2026-11-01',
+    });
+  });
+
+  it('switching to another task and back discards unsaved changes without a prompt', async () => {
+    mockFetch(() => jsonResponse(tasks));
+    renderHome();
+    await userEvent.click(await screen.findByRole('button', { name: 'לקנות מצרכים' }));
+    await userEvent.type(screen.getByLabelText('תיאור'), ' וגבינה');
+    await userEvent.click(screen.getByRole('button', { name: /^לסיים דוח/ }));
+    expect(screen.getByLabelText('כותרת')).toHaveValue('לסיים דוח');
+    await userEvent.click(screen.getByRole('button', { name: 'לקנות מצרכים' }));
+    expect(screen.getByLabelText('תיאור')).toHaveValue('חלב ולחם');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('deleting removes the task and returns to the selection message', async () => {
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
+      init?.method === 'DELETE' ? Promise.resolve(new Response(null, { status: 204 })) : jsonResponse(tasks),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    renderHome();
+    await userEvent.click(await screen.findByRole('button', { name: /^לסיים דוח/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'מחק משימה' }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'מחיקת משימה' })).getByRole('button', { name: 'אישור' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getAllByRole('listitem').map((row) => row.textContent)).toEqual(['לקנות מצרכים', 'לבדוק ביטוח לרכב']);
+    expect(screen.getByText('בחר משימה מהרשימה כדי לצפות בפרטיה')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'DELETE').map(([url]) => url)).toEqual([
+      '/api/tasks/2',
+    ]);
+  });
+
+  it('a failed delete keeps the task in the list and shows the error', async () => {
+    mockFetch(() => jsonResponse(tasks));
+    renderHome();
+    await userEvent.click(await screen.findByRole('button', { name: /^לסיים דוח/ }));
+    vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ error: { code: 'X', message: 'השירות אינו זמין כרגע.' } }, 503)));
+    await userEvent.click(screen.getByRole('button', { name: 'מחק משימה' }));
+    const dialog = screen.getByRole('dialog', { name: 'מחיקת משימה' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'אישור' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('השירות אינו זמין כרגע.');
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'ביטול' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('כותרת')).toHaveValue('לסיים דוח');
+  });
+
+  it('deleting from a full list enables adding again', async () => {
+    const full: Task[] = Array.from({ length: 1000 }, (_, i) => ({
+      id: `t${i}`, title: `משימה ${i}`, description: null, dueDate: null, completed: false, position: i,
+    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) =>
+        init?.method === 'DELETE' ? Promise.resolve(new Response(null, { status: 204 })) : jsonResponse(full),
+      ),
+    );
+    renderHome();
+    expect(await screen.findByText('הרשימה מלאה (1,000 משימות)')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'משימה 5' }));
+    await userEvent.click(screen.getByRole('button', { name: 'מחק משימה' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'אישור' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'הוסף משימה' })).toBeEnabled());
+    expect(screen.queryByText('הרשימה מלאה (1,000 משימות)')).not.toBeInTheDocument();
   });
 
   it('creates a task: closes the modal, appends it and selects it', async () => {
