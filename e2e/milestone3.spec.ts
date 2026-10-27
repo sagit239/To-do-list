@@ -45,7 +45,7 @@ async function stored(id: string) {
 
 async function openTask(page: Page, title: string) {
   await page.goto('/');
-  await page.getByRole('button', { name: title }).click();
+  await page.getByRole('button', { name: title, exact: true }).click();
   const details = page.getByRole('region', { name: 'פרטי משימה' });
   await expect(details.getByLabel('כותרת')).toHaveValue(title);
   return details;
@@ -85,7 +85,7 @@ test('editing and saving the details persists in the database and after refresh'
   });
 
   await page.reload();
-  await page.getByRole('button', { name: newTitle }).click();
+  await page.getByRole('button', { name: newTitle, exact: true }).click();
   await expect(details.getByLabel('תיאור')).toHaveValue(`${PREFIX} תיאור חדש`);
   await expect(details.getByLabel('תאריך יעד')).toHaveValue('2031-06-20');
 });
@@ -150,20 +150,20 @@ test('unsaved changes are discarded on switching task, leaving to About, and ref
   const details = await openTask(page, title);
 
   await details.getByLabel('תיאור').fill('שינוי שלא נשמר');
-  await page.getByRole('button', { name: E2E_TASKS.first }).click();
-  await page.getByRole('button', { name: title }).click();
+  await page.getByRole('button', { name: E2E_TASKS.first, exact: true }).click();
+  await page.getByRole('button', { name: title, exact: true }).click();
   await expect(details.getByLabel('תיאור')).toHaveValue('מקורי');
 
   await details.getByLabel('תיאור').fill('שינוי שלא נשמר');
   await page.getByRole('link', { name: 'אודות' }).click();
   await page.getByRole('link', { name: 'דף הבית' }).click();
   await expect(page.getByText(NO_SELECTION)).toBeVisible();
-  await page.getByRole('button', { name: title }).click();
+  await page.getByRole('button', { name: title, exact: true }).click();
   await expect(details.getByLabel('תיאור')).toHaveValue('מקורי');
 
   await details.getByLabel('תיאור').fill('שינוי שלא נשמר');
   await page.reload();
-  await page.getByRole('button', { name: title }).click();
+  await page.getByRole('button', { name: title, exact: true }).click();
   await expect(details.getByLabel('תיאור')).toHaveValue('מקורי');
 });
 

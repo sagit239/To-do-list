@@ -83,3 +83,6 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 export function isUuid(value: unknown): value is string {
   return typeof value === 'string' && UUID_PATTERN.test(value);
 }
+
+// 1,000 UUIDs take about 39KB of JSON (ADR-9).
+export const ORDER_BODY_LIMIT = 64 * 1024;

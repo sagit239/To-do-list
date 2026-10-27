@@ -92,3 +92,16 @@ export async function updateTask(id: string, input: TaskInput): Promise<Task> {
 export async function deleteTask(id: string): Promise<void> {
   await sendWrite(`/api/tasks/${encodeURIComponent(id)}`, 'DELETE', DELETE_ERROR_MESSAGE);
 }
+
+export const STATUS_ERROR_MESSAGE = 'שינוי הסטטוס נכשל. נסו שוב.';
+export const ORDER_ERROR_MESSAGE = 'שמירת הסדר נכשלה. נסו שוב.';
+
+export async function setTaskStatus(id: string, completed: boolean): Promise<Task> {
+  return readTask(
+    await sendWrite(`/api/tasks/${encodeURIComponent(id)}/status`, 'PATCH', STATUS_ERROR_MESSAGE, { completed }),
+  );
+}
+
+export async function saveOrder(orderedIds: string[]): Promise<void> {
+  await sendWrite('/api/tasks/order', 'PUT', ORDER_ERROR_MESSAGE, { orderedIds });
+}

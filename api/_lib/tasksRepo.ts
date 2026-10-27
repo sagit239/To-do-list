@@ -146,3 +146,59 @@ export async function deleteTask(id: string, pool: pg.Pool = getPool()): Promise
     client.release();
   }
 }
+
+/**
+ * Saves an explicit status in a single statement (ADR-9). It touches neither position nor the detail
+ * fields, so it needs no list lock and cannot conflict with structure changes or detail edits.
+ */
+export async function setTaskStatus(id: string, completed: boolean, pool: pg.Pool = getPool()): Promise<Task> {
+  const result = await pool.query<TaskRow>(
+    `update public.tasks set completed = $2
+      where id = $1
+     returning id, title, description, due_date, completed, position`,
+    [id, completed],
+  );
+  if (result.rowCount === 0) throw new TaskNotFoundError();
+  return toTask(result.rows[0]);
+}
+
+export class OrderConflictError extends Error {
+  constructor() {
+    super('Task set changed');
+    this.name = 'OrderConflictError';
+  }
+}
+
+/**
+ * Replaces the list order under the shared list lock (ARCHITECTURE 2.6). The ids must match the
+ * current task set one-to-one; otherwise nothing changes. Positions become 0..N-1 in the given order.
+ */
+export async function reorderTasks(orderedIds: string[], pool: pg.Pool = getPool()): Promise<Task[]> {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    await client.query('select pg_advisory_xact_lock($1)', [LIST_LOCK_KEY]);
+    const existing = await client.query<{ id: string }>('select id from public.tasks');
+    const existingIds = new Set(existing.rows.map((row) => row.id));
+    const sent = orderedIds.map((id) => id.toLowerCase());
+    const oneToOne = new Set(sent).size === sent.length && sent.length === existingIds.size;
+    if (!oneToOne || !sent.every((id) => existingIds.has(id))) {
+      throw new OrderConflictError();
+    }
+    await client.query(
+      `update public.tasks t
+          set position = (o.ord - 1)::int
+         from unnest($1::uuid[]) with ordinality as o(id, ord)
+        where t.id = o.id and t.position <> o.ord - 1`,
+      [sent],
+    );
+    const tasks = await listTasks(client);
+    await client.query('commit');
+    return tasks;
+  } catch (err) {
+    await client.query('rollback').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}

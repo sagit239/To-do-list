@@ -21,10 +21,10 @@ test('home page loads the shared list from the server', async ({ page }) => {
 
 test('selecting a task shows its details', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: E2E_TASKS.first }).click();
-  await expect(page.getByLabel('כותרת')).toHaveValue(E2E_TASKS.first);
-  await expect(page.getByLabel('תיאור')).toHaveValue('תיאור של המשימה הראשונה');
-  await expect(page.getByLabel('תאריך יעד')).toHaveValue('2030-01-15');
+  await page.getByRole('button', { name: E2E_TASKS.first, exact: true }).click();
+  await expect(page.getByLabel('כותרת', { exact: true })).toHaveValue(E2E_TASKS.first);
+  await expect(page.getByLabel('תיאור', { exact: true })).toHaveValue('תיאור של המשימה הראשונה');
+  await expect(page.getByLabel('תאריך יעד', { exact: true })).toHaveValue('2030-01-15');
   await expect(page.getByText(NO_SELECTION)).toHaveCount(0);
 });
 

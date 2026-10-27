@@ -3,11 +3,14 @@ import type pg from 'pg';
 import { createDevPool, restoreSnapshot, takeSnapshot } from '../../test-support/devSnapshot.js';
 import { getPool } from './db.js';
 import {
+  OrderConflictError,
   TaskLimitError,
   TaskNotFoundError,
   createTask,
   deleteTask,
   listTasks,
+  reorderTasks,
+  setTaskStatus,
   updateTaskDetails,
 } from './tasksRepo.js';
 
@@ -275,6 +278,146 @@ describe('deleteTask against the Dev database', () => {
       expect(rows).toHaveLength(5);
       expect(rows.map((r) => r.position)).toEqual([0, 1, 2, 3, 4]);
       expect(rows.map((r) => r.title)).toEqual(expect.arrayContaining(['ישנה 2', 'ישנה 3', 'ישנה 5', 'חדשה 1', 'חדשה 2']));
+    } finally {
+      await visitorB.end();
+    }
+  });
+});
+
+async function positionsAndIds() {
+  const result = await admin.query<{ id: string; position: number }>(
+    'select id, position from public.tasks order by position, id',
+  );
+  return result.rows;
+}
+
+async function insertMany(count: number): Promise<string[]> {
+  const ids: string[] = [];
+  for (let i = 0; i < count; i++) ids.push(await insertTask({ title: `משימה ${i}`, completed: i % 2 === 1, position: i }));
+  return ids;
+}
+
+function expectConsecutive(rows: { position: number }[]) {
+  expect(rows.map((r) => r.position)).toEqual(rows.map((_, i) => i));
+}
+
+describe('setTaskStatus against the Dev database', () => {
+  it('checks and unchecks, without touching position or details', async () => {
+    await insertTask({ title: 'ראשונה', position: 0 });
+    const id = await insertTask({ title: 'שנייה', description: 'תיאור', dueDate: '2020-01-01', position: 1 });
+
+    expect(await setTaskStatus(id, true)).toMatchObject({ id, completed: true, position: 1, title: 'שנייה' });
+    expect(await storedRow(id)).toEqual({
+      title: 'שנייה', description: 'תיאור', due_date: '2020-01-01', completed: true, position: 1,
+    });
+    await setTaskStatus(id, false);
+    expect((await storedRow(id)).completed).toBe(false);
+    // Explicit value, not a toggle: saving the same value twice keeps it.
+    await setTaskStatus(id, false);
+    expect((await storedRow(id)).completed).toBe(false);
+  });
+
+  it('throws TaskNotFoundError for a missing task', async () => {
+    await expect(setTaskStatus(MISSING_ID, true)).rejects.toBeInstanceOf(TaskNotFoundError);
+  });
+});
+
+describe('reorderTasks against the Dev database', () => {
+  it('saves the exact order with consecutive positions, completed tasks included', async () => {
+    const [a, b, c, d] = await insertMany(4);
+    const tasks = await reorderTasks([d, b, a, c]);
+    expect(tasks.map((t) => t.id)).toEqual([d, b, a, c]);
+    const rows = await positionsAndIds();
+    expect(rows.map((r) => r.id)).toEqual([d, b, a, c]);
+    expectConsecutive(rows);
+    expect((await storedRow(b)).completed).toBe(true);
+  });
+
+  it('normalizes gaps in stored positions', async () => {
+    const a = await insertTask({ title: 'א', position: 3 });
+    const b = await insertTask({ title: 'ב', position: 9 });
+    await reorderTasks([b, a]);
+    expect(await positionsAndIds()).toEqual([
+      { id: b, position: 0 },
+      { id: a, position: 1 },
+    ]);
+  });
+
+  it('rejects a missing, extra or deleted id with OrderConflictError and changes nothing', async () => {
+    const [a, b, c] = await insertMany(3);
+    const before = await positionsAndIds();
+    for (const ids of [[c, b], [c, b, a, MISSING_ID], [c, b, MISSING_ID], [a, a, b]]) {
+      await expect(reorderTasks(ids)).rejects.toBeInstanceOf(OrderConflictError);
+    }
+    expect(await positionsAndIds()).toEqual(before);
+  });
+
+  it('two concurrent reorders: the final order is exactly one of them', async () => {
+    const ids = await insertMany(6);
+    const orderA = [...ids].reverse();
+    const orderB = [ids[2], ids[0], ids[4], ids[1], ids[5], ids[3]];
+    const visitorB = createDevPool();
+    try {
+      for (let round = 0; round < 3; round++) {
+        await Promise.all([reorderTasks(orderA), reorderTasks(orderB, visitorB)]);
+        const rows = await positionsAndIds();
+        expect([orderA, orderB]).toContainEqual(rows.map((r) => r.id));
+        expectConsecutive(rows);
+      }
+    } finally {
+      await visitorB.end();
+    }
+  });
+
+  it('create during a reorder: no lost or duplicated task, consecutive positions', async () => {
+    const ids = await insertMany(5);
+    const visitorB = createDevPool();
+    try {
+      const [reorder, created] = await Promise.allSettled([
+        reorderTasks([...ids].reverse()),
+        createTask({ title: 'חדשה', description: null, dueDate: null }, visitorB),
+      ]);
+      expect(created.status).toBe('fulfilled');
+      if (reorder.status === 'rejected') expect(reorder.reason).toBeInstanceOf(OrderConflictError);
+      const rows = await positionsAndIds();
+      expect(rows).toHaveLength(6);
+      expect(new Set(rows.map((r) => r.id)).size).toBe(6);
+      expectConsecutive(rows);
+    } finally {
+      await visitorB.end();
+    }
+  });
+
+  it('delete during a reorder: no lost or duplicated task, consecutive positions', async () => {
+    const ids = await insertMany(5);
+    const visitorB = createDevPool();
+    try {
+      const [reorder, deleted] = await Promise.allSettled([
+        reorderTasks([...ids].reverse()),
+        deleteTask(ids[2], visitorB),
+      ]);
+      expect(deleted.status).toBe('fulfilled');
+      if (reorder.status === 'rejected') expect(reorder.reason).toBeInstanceOf(OrderConflictError);
+      const rows = await positionsAndIds();
+      expect(rows.map((r) => r.id).sort()).toEqual(ids.filter((id) => id !== ids[2]).sort());
+      expectConsecutive(rows);
+    } finally {
+      await visitorB.end();
+    }
+  });
+
+  it('status and detail saves during a reorder do not overwrite each other', async () => {
+    const ids = await insertMany(4);
+    const visitorB = createDevPool();
+    try {
+      await Promise.all([
+        reorderTasks([...ids].reverse()),
+        setTaskStatus(ids[0], true, visitorB),
+        updateTaskDetails(ids[1], { title: 'עודכנה', description: null, dueDate: null }, TODAY, visitorB),
+      ]);
+      expect((await positionsAndIds()).map((r) => r.id)).toEqual([...ids].reverse());
+      expect(await storedRow(ids[0])).toMatchObject({ completed: true, position: 3 });
+      expect(await storedRow(ids[1])).toMatchObject({ title: 'עודכנה', completed: true, position: 2 });
     } finally {
       await visitorB.end();
     }

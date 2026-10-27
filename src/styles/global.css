@@ -150,29 +150,47 @@ textarea {
   padding: 0;
 }
 
+.task-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-inline-end: var(--space-1);
+  background: var(--color-surface);
+}
+
 .task-row + .task-row {
   border-top: 1px solid var(--color-border);
+}
+
+.task-row:hover {
+  background: var(--color-background);
+}
+
+.task-row--selected,
+.task-row--selected:hover {
+  background: var(--color-selected);
+}
+
+.task-row--dragging {
+  z-index: 1;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
 }
 
 .task-row__select {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 52px;
   padding: var(--space-1) var(--space-3);
+  padding-inline-end: var(--space-1);
   border: 0;
   background: transparent;
   text-align: start;
   cursor: pointer;
-}
-
-.task-row__select:hover {
-  background: var(--color-background);
-}
-
-.task-row--selected .task-row__select {
-  background: var(--color-selected);
 }
 
 .task-row__check {
@@ -180,17 +198,20 @@ textarea {
   position: relative;
   width: 20px;
   height: 20px;
+  margin: 12px;
   border: 2px solid var(--color-border);
   border-radius: 4px;
   background: var(--color-surface);
+  appearance: none;
+  cursor: pointer;
 }
 
-.task-row--completed .task-row__check {
+.task-row__check:checked {
   border-color: var(--color-primary);
   background: var(--color-primary);
 }
 
-.task-row--completed .task-row__check::after {
+.task-row__check:checked::after {
   content: '';
   position: absolute;
   inset-inline-start: 5px;
@@ -200,6 +221,48 @@ textarea {
   border: solid var(--color-surface);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
+}
+
+.task-row__check:focus-visible,
+.task-row__handle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.task-row__check:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.task-row__handle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  fill: currentColor;
+  cursor: grab;
+  /* Only the handle starts a drag, so touch scrolling still works on the rest of the row. */
+  touch-action: none;
+}
+
+.task-row__handle:hover {
+  color: var(--color-primary);
+}
+
+.task-row--dragging .task-row__handle {
+  cursor: grabbing;
+}
+
+.task-row__handle:disabled {
+  opacity: 0.5;
+  cursor: progress;
 }
 
 .task-row__text {
@@ -214,6 +277,43 @@ textarea {
 .task-row--completed .task-row__text {
   color: var(--color-text-secondary);
   text-decoration: line-through;
+}
+
+.list-alert {
+  flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2);
+  padding: 10px var(--space-2);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-sm);
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  font: var(--font-body-md);
+}
+
+.list-alert__message {
+  flex: 1;
+  margin: 0;
+}
+
+.list-alert__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.list-alert__close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 /* ---------- Task details ---------- */
