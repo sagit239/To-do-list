@@ -11,6 +11,8 @@ const outputs = [
   { source: 'icon.svg', file: 'icon-192.png', size: 192 },
   { source: 'icon.svg', file: 'icon-512.png', size: 512 },
   { source: 'icon-maskable.svg', file: 'icon-maskable-512.png', size: 512 },
+  // iOS ignores manifest icons for the home screen and rounds the corners itself, so it gets the full-bleed version.
+  { source: 'icon-maskable.svg', file: 'apple-touch-icon.png', size: 180 },
 ];
 
 const browser = await chromium.launch();

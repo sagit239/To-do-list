@@ -147,6 +147,14 @@ test('PWA: manifest, icons and theme color are served; no service worker is regi
   await openHome(page);
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest');
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#2F80ED');
+
+  // iOS home screen: its own icon and app title, since Safari ignores the manifest icons.
+  const appleIcon = await request.get('/icons/apple-touch-icon.png');
+  expect(appleIcon.status()).toBe(200);
+  const applePng = await appleIcon.body();
+  expect(`${applePng.readUInt32BE(16)}x${applePng.readUInt32BE(20)}`).toBe('180x180');
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('href', '/icons/apple-touch-icon.png');
+  await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute('content', 'משימות');
   const registrations = await page.evaluate(() => navigator.serviceWorker.getRegistrations().then((r) => r.length));
   expect(registrations).toBe(0);
 });
