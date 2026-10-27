@@ -2,6 +2,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Task } from '../../shared/types';
 import { taskLabel } from '../lib/taskLabel';
+import { DragHandleIcon } from './icons';
 
 interface TaskRowProps {
   task: Task;
@@ -51,14 +52,7 @@ export function TaskRow({ task, selected, statusPending, dragDisabled, onSelect,
         aria-roledescription="ידית גרירה"
         disabled={dragDisabled}
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-          <circle cx="5.5" cy="3" r="1.4" />
-          <circle cx="10.5" cy="3" r="1.4" />
-          <circle cx="5.5" cy="8" r="1.4" />
-          <circle cx="10.5" cy="8" r="1.4" />
-          <circle cx="5.5" cy="13" r="1.4" />
-          <circle cx="10.5" cy="13" r="1.4" />
-        </svg>
+        <DragHandleIcon />
       </button>
     </li>
   );

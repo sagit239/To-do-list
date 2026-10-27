@@ -5,6 +5,7 @@ import { localToday, validateTaskInput } from '../../shared/validation';
 import type { TaskField } from '../../shared/validation';
 import { ApiRequestError, SAVE_ERROR_MESSAGE, updateTask } from '../api/tasksClient';
 import { DeleteTaskModal } from './DeleteTaskModal';
+import { TrashIcon } from './icons';
 
 interface TaskDetailsProps {
   task: Task | null;
@@ -161,6 +162,7 @@ function TaskEditor({ task, onSaved, onDeleted }: TaskDetailsProps & { task: Tas
             {saving ? 'שומר…' : 'שמור שינויים'}
           </button>
           <button type="button" className="btn btn--danger" onClick={() => setDeleteOpen(true)} disabled={saving}>
+            <TrashIcon />
             מחק משימה
           </button>
         </div>

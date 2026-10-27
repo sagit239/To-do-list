@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
-import type { Locator, Page, Route, TestInfo } from '@playwright/test';
+import type { Page, Route } from '@playwright/test';
 import { loadEnv } from 'vite';
 import type pg from 'pg';
 import { createDevPool } from '../test-support/devSnapshot';
+import { dragTo, isMobile } from './drag';
 
 // Each test adds its own tasks with this prefix at the end of the list and removes them afterwards,
 // so the seeded tasks used by earlier tests keep their status and relative order (Dev only, ADR-11).
@@ -55,39 +56,6 @@ const row = (page: Page, title: string) => page.getByRole('listitem').filter({ h
 const handle = (page: Page, title: string) => page.getByRole('button', { name: `גרירה לשינוי מיקום: ${title}` });
 const checkbox = (page: Page, title: string) => page.getByRole('checkbox', { name: `סימון המשימה כהושלמה: ${title}` });
 
-const isMobile = (testInfo: TestInfo) => testInfo.project.name.startsWith('mobile');
-
-/** Real touch events on mobile (Chrome DevTools Protocol), mouse on desktop. */
-async function dragTo(page: Page, testInfo: TestInfo, from: Locator, to: Locator) {
-  await from.scrollIntoViewIfNeeded();
-  const a = (await from.boundingBox())!;
-  const b = (await to.boundingBox())!;
-  const start = { x: a.x + a.width / 2, y: a.y + a.height / 2 };
-  const end = { x: start.x, y: b.y + b.height / 2 + (b.y > a.y ? 6 : -6) };
-  const steps = 12;
-  const point = (i: number) => ({ x: start.x, y: start.y + ((end.y - start.y) * i) / steps });
-
-  if (isMobile(testInfo)) {
-    const cdp = await page.context().newCDPSession(page);
-    const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', p?: { x: number; y: number }) =>
-      cdp.send('Input.dispatchTouchEvent', { type, touchPoints: p ? [{ x: p.x, y: p.y }] : [] });
-    await touch('touchStart', start);
-    for (let i = 1; i <= steps; i++) {
-      await touch('touchMove', point(i));
-      await page.waitForTimeout(16);
-    }
-    await touch('touchEnd');
-    await cdp.detach();
-  } else {
-    await page.mouse.move(start.x, start.y);
-    await page.mouse.down();
-    for (let i = 1; i <= steps; i++) {
-      await page.mouse.move(point(i).x, point(i).y);
-      await page.waitForTimeout(16);
-    }
-    await page.mouse.up();
-  }
-}
 
 function fail(method: string, status: number, code: string, message: string) {
   return (route: Route) =>

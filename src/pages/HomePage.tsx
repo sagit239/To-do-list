@@ -13,6 +13,7 @@ import {
 import { TaskList } from '../components/TaskList';
 import { TaskDetails } from '../components/TaskDetails';
 import { CreateTaskModal } from '../components/CreateTaskModal';
+import { CloseIcon, PlusIcon } from '../components/icons';
 
 type LoadState =
   | { status: 'loading' }
@@ -162,6 +163,7 @@ export function HomePage() {
             aria-describedby={listFull ? 'list-full-notice' : undefined}
             onClick={() => setCreateOpen(true)}
           >
+            <PlusIcon />
             הוסף משימה
           </button>
         </div>
@@ -196,7 +198,7 @@ export function HomePage() {
                   aria-label="סגירת ההודעה"
                   onClick={() => setListAlert(null)}
                 >
-                  ×
+                  <CloseIcon size={20} />
                 </button>
               </div>
             </div>

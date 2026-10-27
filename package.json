@@ -17,6 +17,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
     "db:push": "supabase db push",
+    "icons": "node scripts/generate-icons.mjs",
     "postinstall": "node scripts/install-browser.mjs"
   },
   "dependencies": {

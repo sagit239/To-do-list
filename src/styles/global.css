@@ -57,25 +57,45 @@ textarea {
   gap: var(--space-1);
   max-width: 1200px;
   margin: 0 auto;
-  padding: var(--space-1) var(--space-3);
+  padding: 0 var(--space-3);
 }
 
+/* Tab-style links: the active page gets blue text and a blue underline (style guide). */
 .nav__link {
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-primary);
+  display: inline-flex;
+  align-items: center;
+  min-height: 56px;
+  padding: 0 var(--space-2);
+  border-bottom: 3px solid transparent;
+  color: var(--color-text-secondary);
   font: var(--font-body-lg);
+  font-weight: 500;
   text-decoration: none;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
 .nav__link:hover {
   background: var(--color-background);
+  color: var(--color-text-primary);
 }
 
-.nav__link--active {
+.nav__link--active,
+.nav__link--active:hover {
+  border-bottom-color: var(--color-primary);
   background: var(--color-selected);
   color: var(--color-primary);
   font-weight: 600;
+}
+
+/* ---------- Offline notice ---------- */
+
+.offline-notice {
+  padding: 10px var(--space-3);
+  border-bottom: 1px solid var(--color-warning);
+  background: var(--color-warning-soft);
+  color: var(--color-text-primary);
+  font: var(--font-body-md);
+  text-align: center;
 }
 
 /* ---------- Page ---------- */
@@ -170,6 +190,8 @@ textarea {
 .task-row--selected,
 .task-row--selected:hover {
   background: var(--color-selected);
+  /* Accent on the inline-start (right in RTL) edge of the selected row. */
+  box-shadow: inset -3px 0 0 var(--color-primary);
 }
 
 .task-row--dragging {
@@ -265,6 +287,10 @@ textarea {
   cursor: progress;
 }
 
+.task-row__select:focus-visible {
+  outline-offset: -2px;
+}
+
 .task-row__text {
   flex: 1;
   min-width: 0;
@@ -305,8 +331,12 @@ textarea {
 }
 
 .list-alert__close {
-  width: 32px;
-  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -346,6 +376,16 @@ textarea {
   text-align: right;
 }
 
+.field__input:hover {
+  border-color: var(--color-text-secondary);
+}
+
+.field__input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
 .field__input::placeholder {
   color: var(--color-text-secondary);
 }
@@ -361,6 +401,10 @@ textarea {
 
 .field__input[aria-invalid='true'] {
   border-color: var(--color-error);
+}
+
+.field__input[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px var(--color-error-ring);
 }
 
 .field__error {
@@ -398,6 +442,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: var(--space-1);
   min-height: 44px;
   padding: 10px var(--space-3);
   border: 1px solid transparent;
@@ -504,7 +549,12 @@ textarea {
 
 .modal__close {
   display: inline-flex;
-  padding: 4px;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -10px;
+  padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -548,6 +598,8 @@ textarea {
 /* ---------- About ---------- */
 
 .about {
+  max-width: 880px;
+  margin: 0 auto;
   padding: var(--space-4);
 }
 
@@ -562,7 +614,15 @@ textarea {
 
 @media (max-width: 767px) {
   .nav {
-    padding: var(--space-1) var(--space-2);
+    padding: 0 var(--space-2);
+  }
+
+  .nav__link {
+    min-height: 48px;
+  }
+
+  .offline-notice {
+    padding-inline: var(--space-2);
   }
 
   .page {
@@ -584,8 +644,16 @@ textarea {
     gap: var(--space-1);
   }
 
+  /* A tall modal scrolls with the overlay instead of being cut off by the narrow viewport. */
+  .modal-overlay {
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
   .modal {
-    padding: var(--space-2);
+    max-height: none;
+    margin-block: auto;
+    padding: var(--space-3) var(--space-2);
   }
 
   .workspace {

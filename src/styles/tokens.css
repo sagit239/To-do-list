@@ -18,6 +18,9 @@
   --color-error-hover: #d94545;
   --color-success-soft: #eaf7ef;
   --color-success-text: #1e7e46;
+  --color-warning-soft: #fef8e6;
+  --color-focus-ring: rgba(47, 128, 237, 0.18);
+  --color-error-ring: rgba(235, 87, 87, 0.18);
 
   --font-family: 'Inter Variable', 'Segoe UI', Roboto, 'Noto Sans Hebrew', Arial, sans-serif;
   --font-h1: 700 32px / 1.25 var(--font-family);
