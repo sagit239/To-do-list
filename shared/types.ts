@@ -10,6 +10,14 @@ export interface Task {
   position: number;
 }
 
+/** Editable task fields, as sent to POST /api/tasks. */
+export interface TaskInput {
+  title: string | null;
+  description: string | null;
+  /** YYYY-MM-DD or null. */
+  dueDate: string | null;
+}
+
 export interface ApiError {
   error: {
     code: string;

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { Task } from '../../shared/types';
+import { TASK_LIMIT } from '../../shared/validation';
 import { ApiRequestError, NETWORK_ERROR_MESSAGE, fetchTasks } from '../api/tasksClient';
 import { TaskList } from '../components/TaskList';
 import { TaskDetails } from '../components/TaskDetails';
+import { CreateTaskModal } from '../components/CreateTaskModal';
 
 type LoadState =
   | { status: 'loading' }
@@ -12,6 +14,7 @@ type LoadState =
 export function HomePage() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isCreateOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -27,11 +30,37 @@ export function HomePage() {
 
   const tasks = state.status === 'ready' ? state.tasks : [];
   const selectedTask = tasks.find((task) => task.id === selectedId) ?? null;
+  const listFull = tasks.length >= TASK_LIMIT;
+
+  function handleCreated(task: Task) {
+    // The server appends new tasks at the end of the list.
+    setState((current) =>
+      current.status === 'ready' ? { status: 'ready', tasks: [...current.tasks, task] } : current,
+    );
+    setSelectedId(task.id);
+    setCreateOpen(false);
+  }
 
   return (
     <>
       <div className="page-header">
         <h1 className="page-title">המשימות שלי</h1>
+        <div className="page-header__actions">
+          {listFull && (
+            <p id="list-full-notice" className="page-header__notice">
+              הרשימה מלאה (1,000 משימות)
+            </p>
+          )}
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={state.status !== 'ready' || listFull}
+            aria-describedby={listFull ? 'list-full-notice' : undefined}
+            onClick={() => setCreateOpen(true)}
+          >
+            הוסף משימה
+          </button>
+        </div>
       </div>
       <div className="workspace">
         <section className="panel" aria-labelledby="task-list-title">
@@ -59,6 +88,7 @@ export function HomePage() {
           <TaskDetails key={selectedTask?.id ?? 'none'} task={selectedTask} />
         </section>
       </div>
+      {isCreateOpen && <CreateTaskModal onClose={() => setCreateOpen(false)} onCreated={handleCreated} />}
     </>
   );
 }

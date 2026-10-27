@@ -1,4 +1,4 @@
-import type { VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { ApiError } from '../../shared/types.js';
 
 export function sendJson(res: VercelResponse, status: number, body: unknown): void {
@@ -27,4 +27,41 @@ export function sendServerError(res: VercelResponse, err: unknown): void {
   const code = (err as { code?: string } | null)?.code;
   console.error('Database request failed', code ?? (err instanceof Error ? err.name : 'unknown'));
   sendError(res, 503, 'SERVICE_UNAVAILABLE', 'השירות אינו זמין כרגע. נסו שוב בעוד רגע.');
+}
+
+export const DEFAULT_BODY_LIMIT = 16 * 1024;
+
+export type BodyResult =
+  | { ok: true; body: Record<string, unknown> }
+  | { ok: false; status: number; code: string; message: string };
+
+/** Accepts only a JSON object body within the size limit. */
+export function readJsonBody(req: VercelRequest, maxBytes = DEFAULT_BODY_LIMIT): BodyResult {
+  const contentType = String(req.headers['content-type'] ?? '').toLowerCase();
+  if (!contentType.startsWith('application/json')) {
+    return { ok: false, status: 415, code: 'UNSUPPORTED_MEDIA_TYPE', message: 'יש לשלוח את הבקשה בפורמט JSON.' };
+  }
+  const tooLarge = { ok: false, status: 413, code: 'PAYLOAD_TOO_LARGE', message: 'הבקשה גדולה מדי.' } as const;
+  const declaredLength = Number(req.headers['content-length']);
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) return tooLarge;
+
+  let body: unknown;
+  try {
+    // Vercel parses the body lazily and throws on malformed JSON.
+    body = req.body;
+  } catch {
+    body = undefined;
+  }
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      body = undefined;
+    }
+  }
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return { ok: false, status: 400, code: 'INVALID_BODY', message: 'הבקשה אינה תקינה.' };
+  }
+  if (Buffer.byteLength(JSON.stringify(body)) > maxBytes) return tooLarge;
+  return { ok: true, body: body as Record<string, unknown> };
 }

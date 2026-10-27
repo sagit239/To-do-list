@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { Task } from '../../shared/types';
@@ -70,12 +70,81 @@ describe('HomePage', () => {
     expect(screen.queryByText('בחר משימה מהרשימה כדי לצפות בפרטיה')).not.toBeInTheDocument();
   });
 
-  it('does not show write actions in this milestone', async () => {
+  it('does not show edit or delete actions yet', async () => {
     mockFetch(() => jsonResponse(tasks));
     renderHome();
     await userEvent.click(await screen.findByRole('button', { name: 'לקנות מצרכים' }));
-    expect(screen.queryByRole('button', { name: /הוסף משימה|שמור שינויים|מחק משימה/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /שמור שינויים|מחק משימה/ })).toBeNull();
     expect(screen.getByLabelText('כותרת')).toHaveAttribute('readonly');
+  });
+
+  it('creates a task: closes the modal, appends it and selects it', async () => {
+    const created: Task = {
+      id: 'new', title: 'משימה חדשה', description: 'פרטים', dueDate: null, completed: false, position: 3,
+    };
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
+      init?.method === 'POST' ? jsonResponse(created, 201) : jsonResponse(tasks),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    renderHome();
+    await userEvent.click(await screen.findByRole('button', { name: 'הוסף משימה' }));
+    const dialog = screen.getByRole('dialog', { name: 'הוספת משימה' });
+    await userEvent.type(within(dialog).getByLabelText('כותרת'), 'משימה חדשה');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'הוסף משימה' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const rows = screen.getAllByRole('listitem');
+    expect(rows).toHaveLength(4);
+    expect(rows[3]).toHaveTextContent('משימה חדשה');
+    expect(rows[3]).toHaveClass('task-row--selected');
+    expect(screen.getByLabelText('כותרת')).toHaveValue('משימה חדשה');
+    expect(screen.getByLabelText('תיאור')).toHaveValue('פרטים');
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+  });
+
+  it('closing without saving discards the draft; reopening starts empty', async () => {
+    mockFetch(() => jsonResponse(tasks));
+    renderHome();
+    const addButton = await screen.findByRole('button', { name: 'הוסף משימה' });
+    await userEvent.click(addButton);
+    await userEvent.type(screen.getByLabelText('כותרת'), 'טיוטה');
+    await userEvent.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: 'סגור' })[1]);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(addButton).toHaveFocus();
+
+    await userEvent.click(addButton);
+    expect(screen.getByLabelText('כותרת')).toHaveValue('');
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
+
+  it('disables adding with a notice when the list has 1,000 tasks', async () => {
+    const full: Task[] = Array.from({ length: 1000 }, (_, i) => ({
+      id: `t${i}`, title: `משימה ${i}`, description: null, dueDate: null, completed: false, position: i,
+    }));
+    mockFetch(() => jsonResponse(full));
+    renderHome();
+    expect(await screen.findByText('הרשימה מלאה (1,000 משימות)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'הוסף משימה' })).toBeDisabled();
+  });
+
+  it('keeps adding disabled while loading and after a load error', async () => {
+    mockFetch(() => new Promise(() => {}));
+    const { unmount } = renderHome();
+    expect(screen.getByRole('button', { name: 'הוסף משימה' })).toBeDisabled();
+    unmount();
+
+    mockFetch(() => Promise.reject(new TypeError('Failed to fetch')));
+    renderHome();
+    await screen.findByRole('alert');
+    expect(screen.getByRole('button', { name: 'הוסף משימה' })).toBeDisabled();
+  });
+
+  it('enables adding when the list is ready, also when empty', async () => {
+    mockFetch(() => jsonResponse([]));
+    renderHome();
+    await screen.findByText('אין משימות ברשימה');
+    expect(screen.getByRole('button', { name: 'הוסף משימה' })).toBeEnabled();
+    expect(screen.queryByText('הרשימה מלאה (1,000 משימות)')).not.toBeInTheDocument();
   });
 
   it('shows an empty state for an empty list', async () => {

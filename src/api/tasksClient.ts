@@ -1,30 +1,34 @@
-import type { ApiError, Task } from '../../shared/types';
+import type { ApiError, Task, TaskInput } from '../../shared/types';
 
 export const NETWORK_ERROR_MESSAGE = 'אין חיבור לשרת. בדקו את החיבור לאינטרנט ורעננו את הדף.';
+export const SAVE_NETWORK_ERROR_MESSAGE = 'אין חיבור לשרת. בדקו את החיבור לאינטרנט ונסו שוב.';
 const GENERIC_ERROR_MESSAGE = 'לא ניתן לטעון את המשימות. רעננו את הדף כדי לנסות שוב.';
+export const SAVE_ERROR_MESSAGE = 'השמירה נכשלה. נסו שוב.';
 
 export class ApiRequestError extends Error {
   readonly status: number | null;
   readonly code: string;
+  readonly field?: string;
 
-  constructor(message: string, status: number | null, code: string) {
+  constructor(message: string, status: number | null, code: string, field?: string) {
     super(message);
     this.name = 'ApiRequestError';
     this.status = status;
     this.code = code;
+    this.field = field;
   }
 }
 
-async function readError(response: Response): Promise<ApiRequestError> {
+async function readError(response: Response, fallbackMessage = GENERIC_ERROR_MESSAGE): Promise<ApiRequestError> {
   try {
     const body = (await response.json()) as Partial<ApiError>;
     if (body.error?.message) {
-      return new ApiRequestError(body.error.message, response.status, body.error.code ?? 'ERROR');
+      return new ApiRequestError(body.error.message, response.status, body.error.code ?? 'ERROR', body.error.field);
     }
   } catch {
     // Non-JSON error body (e.g. platform error page).
   }
-  return new ApiRequestError(GENERIC_ERROR_MESSAGE, response.status, 'ERROR');
+  return new ApiRequestError(fallbackMessage, response.status, 'ERROR');
 }
 
 export async function fetchTasks(signal?: AbortSignal): Promise<Task[]> {
@@ -46,4 +50,23 @@ export async function fetchTasks(signal?: AbortSignal): Promise<Task[]> {
     throw new ApiRequestError(GENERIC_ERROR_MESSAGE, response.status, 'INVALID_RESPONSE');
   }
   return body as Task[];
+}
+
+export async function createTask(input: TaskInput): Promise<Task> {
+  let response: Response;
+  try {
+    response = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  } catch {
+    throw new ApiRequestError(SAVE_NETWORK_ERROR_MESSAGE, null, 'NETWORK_ERROR');
+  }
+  if (!response.ok) throw await readError(response, SAVE_ERROR_MESSAGE);
+  try {
+    return (await response.json()) as Task;
+  } catch {
+    throw new ApiRequestError(SAVE_ERROR_MESSAGE, response.status, 'INVALID_RESPONSE');
+  }
 }
